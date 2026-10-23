@@ -28,6 +28,7 @@ class ShizukuConnector {
     val state: StateFlow<ShizukuState> = _state.asStateFlow()
 
     private var service: IVolumeService? = null
+    private var binding = false
 
     private val serviceArgs = Shizuku.UserServiceArgs(
         ComponentName(BuildConfig.APPLICATION_ID, VolumeUserService::class.java.name),
@@ -45,12 +46,14 @@ class ShizukuConnector {
                 return
             }
             Log.i(TAG, "UserService collegato")
+            binding = false
             service = IVolumeService.Stub.asInterface(binder)
             refresh()
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
             Log.w(TAG, "UserService scollegato")
+            binding = false
             service = null
             refresh()
         }
@@ -58,6 +61,7 @@ class ShizukuConnector {
 
     private val binderReceived = Shizuku.OnBinderReceivedListener { refresh() }
     private val binderDead = Shizuku.OnBinderDeadListener {
+        binding = false
         service = null
         refresh()
     }
@@ -85,6 +89,7 @@ class ShizukuConnector {
     fun restartService() {
         runCatching { Shizuku.unbindUserService(serviceArgs, connection, true) }
             .onFailure { Log.e(TAG, "unbindUserService fallito", it) }
+        binding = false
         service = null
         refresh()
     }
@@ -102,10 +107,13 @@ class ShizukuConnector {
     }
 
     private fun bind() {
+        if (binding) return
+        binding = true
         try {
             Shizuku.bindUserService(serviceArgs, connection)
         } catch (t: Throwable) {
             Log.e(TAG, "bindUserService fallito", t)
+            binding = false
         }
     }
 
